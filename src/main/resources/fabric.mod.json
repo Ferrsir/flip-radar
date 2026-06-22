@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "flipradar",
+  "version": "${version}",
+  "name": "Flip Radar",
+  "description": "Safe manual Hypixel SkyBlock BIN flip scanner.",
+  "authors": [
+    "ferri"
+  ],
+  "contact": {
+    "sources": "https://github.com/ferri/flip-radar"
+  },
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "com.flipradar.FlipRadarClient"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.17.0",
+    "minecraft": "1.21.11",
+    "fabric-api": "*",
+    "java": ">=21"
+  }
+}
