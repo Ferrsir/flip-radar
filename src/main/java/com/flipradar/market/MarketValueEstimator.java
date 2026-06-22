@@ -9,18 +9,26 @@ public final class MarketValueEstimator {
     public long estimate(AuctionItem auction, List<AuctionItem> activeAuctions) {
         List<Long> comparablePrices = activeAuctions.stream()
                 .filter(candidate -> candidate.signature().equals(auction.signature()))
+                .filter(candidate -> !candidate.uuid().equals(auction.uuid()))
                 .map(AuctionItem::binPrice)
                 .sorted()
                 .toList();
 
-        if (comparablePrices.size() < 4) {
+        if (comparablePrices.size() < 3) {
             return 0L;
         }
 
-        int trimmedStart = Math.max(0, comparablePrices.size() / 10);
-        int trimmedEnd = Math.max(trimmedStart + 1, comparablePrices.size() - trimmedStart);
-        List<Long> trimmed = comparablePrices.subList(trimmedStart, trimmedEnd);
-        return median(trimmed);
+        List<Long> nearbyMarket = comparablePrices.stream()
+                .filter(price -> price >= Math.round(auction.binPrice() * 1.04D))
+                .limit(10)
+                .toList();
+
+        if (nearbyMarket.size() >= 3) {
+            return median(nearbyMarket);
+        }
+
+        int lowClusterEnd = Math.min(comparablePrices.size(), 12);
+        return median(comparablePrices.subList(0, lowClusterEnd));
     }
 
     private long median(List<Long> values) {

@@ -9,7 +9,9 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -23,8 +25,10 @@ public final class FlipScanner {
     private final AtomicBoolean scanning = new AtomicBoolean(false);
 
     private volatile List<FlipCandidate> latest = List.of();
+    private volatile List<FlipCandidate> newAlerts = List.of();
     private volatile Instant lastScan = Instant.EPOCH;
     private volatile String apiStatus = "Idle";
+    private final Set<String> alertedAuctions = new HashSet<>();
 
     public FlipScanner(AuctionPageFetcher pageFetcher, LocalCache cache, ConfigManager configManager) {
         this.pageFetcher = pageFetcher;
@@ -38,7 +42,7 @@ public final class FlipScanner {
         apiStatus = "Scanning";
         CompletableFuture.runAsync(() -> {
             try {
-                List<AuctionItem> auctions = pageFetcher.fetchBinAuctions(8);
+                List<AuctionItem> auctions = pageFetcher.fetchBinAuctions(configManager.get().scanPageLimit);
                 List<FlipCandidate> candidates = new ArrayList<>();
                 for (AuctionItem auction : auctions) {
                     long value = estimator.estimate(auction, auctions);
@@ -55,10 +59,12 @@ public final class FlipScanner {
                     }
                 }
 
-                latest = candidates.stream()
+                List<FlipCandidate> sorted = candidates.stream()
                         .sorted(Comparator.comparingLong(FlipCandidate::profitAfterTax).reversed())
-                        .limit(100)
+                        .limit(configManager.get().maxFlipResults)
                         .toList();
+                latest = sorted;
+                newAlerts = collectNewAlerts(sorted);
                 lastScan = Instant.now();
                 apiStatus = "OK";
             } catch (Exception exception) {
@@ -83,5 +89,26 @@ public final class FlipScanner {
 
     public boolean isScanning() {
         return scanning.get();
+    }
+
+    public synchronized List<FlipCandidate> consumeNewAlerts() {
+        List<FlipCandidate> alerts = newAlerts;
+        newAlerts = List.of();
+        return alerts;
+    }
+
+    private synchronized List<FlipCandidate> collectNewAlerts(List<FlipCandidate> sorted) {
+        List<FlipCandidate> alerts = new ArrayList<>();
+        int limit = Math.max(0, configManager.get().maxChatAlertsPerScan);
+        for (FlipCandidate candidate : sorted) {
+            if (alerts.size() >= limit) {
+                break;
+            }
+            String uuid = candidate.auction().uuid().toString();
+            if (alertedAuctions.add(uuid)) {
+                alerts.add(candidate);
+            }
+        }
+        return alerts;
     }
 }
