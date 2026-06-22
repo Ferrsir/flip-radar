@@ -1,6 +1,7 @@
 package com.flipradar.ui;
 
 import com.flipradar.config.ConfigManager;
+import com.flipradar.config.FlipRadarConfig;
 import com.flipradar.market.FlipCandidate;
 import com.flipradar.market.FlipScanner;
 import com.flipradar.safe.SafeAuctionOpener;
@@ -18,13 +19,23 @@ import java.util.List;
 import java.util.Locale;
 
 public final class FlipRadarScreen extends Screen {
-    private static final int PURPLE = 0xFFB86CFF;
-    private static final int DARK = 0xEE090B12;
-    private static final int PANEL = 0xFF151827;
+    private static final int BG = 0xEE080A12;
+    private static final int SIDEBAR_BG = 0xFF0C0F1D;
+    private static final int HEADER_BG = 0xFF101421;
+    private static final int PANEL = 0xFF151927;
+    private static final int PANEL_SOFT = 0xFF1A1F31;
+    private static final int ROW_ALT = 0xFF111625;
+    private static final int ROW_SELECTED = 0xFF2B1E46;
     private static final int LINE = 0xFF2E3150;
-    private static final int SIDEBAR = 116;
-    private static final int HEADER = 54;
-    private static final String[] NAV = {"Flip Radar", "Watchlist", "Craft Flips", "Pet Flips", "Recent Sales", "Profit Tracker", "Settings", "About"};
+    private static final int PURPLE = 0xFFB86CFF;
+    private static final int TEXT = 0xFFE8EAF6;
+    private static final int MUTED = 0xFFABB2D6;
+    private static final int GREEN = 0xFF7CFFB2;
+    private static final int YELLOW = 0xFFFFD166;
+    private static final int RED = 0xFFFF6B7A;
+    private static final int SIDEBAR = 126;
+    private static final int HEADER = 64;
+    private static final String[] NAV = {"Flip Radar", "Watchlist", "Pet Flips", "Recent Sales", "Profit Tracker", "Settings", "About"};
     private static final NumberFormat COINS = NumberFormat.getIntegerInstance(Locale.US);
 
     private final FlipScanner scanner;
@@ -46,17 +57,16 @@ public final class FlipRadarScreen extends Screen {
         addDrawableChild(ButtonWidget.builder(Text.literal(scanner.isScanning() ? "Scanning..." : "Refresh"), button -> {
             scanner.refreshAsync();
             rebuild();
-        }).dimensions(width - 98, 14, 78, 20).build());
+        }).dimensions(width - 98, 18, 78, 20).build());
 
-        if (!displayedFlips().isEmpty()) {
-            int detailWidth = detailWidth();
-            int openX = detailWidth > 0 ? width - detailWidth + 12 : width - 142;
+        if (!displayedFlips().isEmpty() && detailWidth() > 0) {
+            int detailX = width - detailWidth() - 12;
             addDrawableChild(ButtonWidget.builder(Text.literal("Open Auction"), button -> {
                 List<FlipCandidate> flips = displayedFlips();
                 FlipCandidate candidate = flips.get(Math.min(selectedIndex, flips.size() - 1));
                 auctionOpener.openAuctionManually(candidate.auction());
                 close();
-            }).dimensions(openX, height - 30, Math.min(124, detailWidth - 24), 20).build());
+            }).dimensions(detailX + 16, height - 34, detailWidth() - 32, 22).build());
         }
     }
 
@@ -67,10 +77,10 @@ public final class FlipRadarScreen extends Screen {
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        context.fill(0, 0, width, height, DARK);
+        context.fill(0, 0, width, height, BG);
         renderSidebar(context);
         renderHeader(context);
-        renderMain(context);
+        renderContent(context);
         super.render(context, mouseX, mouseY, delta);
     }
 
@@ -83,9 +93,9 @@ public final class FlipRadarScreen extends Screen {
         double mouseX = click.x();
         double mouseY = click.y();
         if (mouseX < SIDEBAR) {
-            int navY = 38;
+            int navY = 76;
             for (String item : NAV) {
-                if (mouseY >= navY - 5 && mouseY <= navY + 14) {
+                if (mouseY >= navY - 6 && mouseY <= navY + 15) {
                     if ("Settings".equals(item)) {
                         client.setScreen(new FlipRadarSettingsScreen(configManager, this));
                     } else {
@@ -96,146 +106,156 @@ public final class FlipRadarScreen extends Screen {
                     }
                     return true;
                 }
-                navY += 22;
+                navY += 24;
             }
         }
 
-        int tableX = SIDEBAR + 12;
-        int tableY = HEADER + 16;
-        int rowTop = tableY + 25;
-        int tableRight = tableRight();
-        if (mouseX >= tableX && mouseX <= tableRight && mouseY >= rowTop && mouseY <= height - 42) {
-            int row = ((int) mouseY - rowTop) / 16;
+        int rowTop = tableY() + 30;
+        if (mouseX >= tableX() && mouseX <= tableRight() && mouseY >= rowTop && mouseY <= tableBottom()) {
+            int row = ((int) mouseY - rowTop) / rowHeight();
             int index = scrollOffset + row;
             if (index >= 0 && index < displayedFlips().size()) {
                 selectedIndex = index;
                 return true;
             }
         }
-
         return false;
     }
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
         List<FlipCandidate> flips = displayedFlips();
-        int maxVisible = visibleRows();
-        int maxScroll = Math.max(0, flips.size() - maxVisible);
+        int maxScroll = Math.max(0, flips.size() - visibleRows());
         if (maxScroll > 0) {
             scrollOffset = Math.max(0, Math.min(maxScroll, scrollOffset - (int) Math.signum(verticalAmount) * 3));
-            selectedIndex = Math.max(scrollOffset, Math.min(selectedIndex, scrollOffset + maxVisible - 1));
+            selectedIndex = Math.max(scrollOffset, Math.min(selectedIndex, scrollOffset + visibleRows() - 1));
             return true;
         }
         return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
     }
 
     private void renderSidebar(DrawContext context) {
-        context.fill(0, 0, SIDEBAR, height, 0xFF0D1020);
-        int y = 38;
+        context.fill(0, 0, SIDEBAR, height, SIDEBAR_BG);
+        drawText(context, "FLIP", 18, 22, PURPLE);
+        drawText(context, "RADAR", 18, 36, PURPLE);
+        drawText(context, "safe manual scan", 18, 54, 0xFF6F779F);
+
+        int y = 76;
         for (String item : NAV) {
             boolean selected = item.equals(activeTab);
             if (selected) {
-                context.fill(10, y - 7, SIDEBAR - 10, y + 16, 0xFF23183A);
+                context.fill(12, y - 7, SIDEBAR - 12, y + 16, 0xFF241A3C);
             }
-            drawText(context, item, 14, y, selected ? PURPLE : 0xFFABB2D6);
-            y += 22;
+            drawText(context, item, 18, y, selected ? PURPLE : MUTED);
+            y += 24;
         }
     }
 
     private void renderHeader(DrawContext context) {
-        context.fill(SIDEBAR, 0, width, HEADER, 0xFF101422);
-        drawText(context, "FLIP RADAR", SIDEBAR + 14, 12, PURPLE);
-        drawText(context, scanner.isScanning() ? "Live BIN scan running" : "Live BIN scan idle", SIDEBAR + 14, 30, 0xFFABB2D6);
+        context.fill(SIDEBAR, 0, width, HEADER, HEADER_BG);
+        int x = SIDEBAR + 14;
+        drawText(context, "Flip Radar", x, 13, PURPLE);
+        drawText(context, scanner.isScanning() ? "Live scan running" : "Live scan idle", x, 30, MUTED);
+        drawText(context, "Found " + scanner.candidatesFound() + " | Scanned " + scanner.auctionsScanned() + " | Filtered " + scanner.candidatesFilteredOut(), x, 47, 0xFF7F87AD);
 
+        int statusX = Math.max(x + 300, width - 270);
         String status = scanner.isScanning()
-                ? "API: page " + scanner.currentPage() + "/" + Math.max(scanner.currentPage(), scanner.totalPages())
-                : "API: " + scanner.apiStatus();
-        drawText(context, status, Math.max(SIDEBAR + 220, width - 220), 30, "OK".equals(scanner.apiStatus()) ? 0xFF7CFFB2 : 0xFFFFD166);
+                ? "Page " + scanner.currentPage() + "/" + Math.max(scanner.currentPage(), scanner.totalPages())
+                : "API " + scanner.apiStatus();
+        drawText(context, status, statusX, 22, "OK".equals(scanner.apiStatus()) ? GREEN : YELLOW);
         if (!scanner.lastScan().equals(java.time.Instant.EPOCH)) {
             String time = DateTimeFormatter.ofPattern("HH:mm:ss").withZone(ZoneId.systemDefault()).format(scanner.lastScan());
-            drawText(context, "Last scan " + time, Math.max(SIDEBAR + 220, width - 220), 14, 0xFFABB2D6);
+            drawText(context, "Last scan " + time, statusX, 39, MUTED);
         }
     }
 
-    private void renderMain(DrawContext context) {
+    private void renderContent(DrawContext context) {
         if ("About".equals(activeTab)) {
-            renderInfo(context, "Flip Radar is informational only. It never buys, clicks slots, or confirms purchases.");
+            renderInfo(context, "Informational only. No auto-buy, no slot clicking, no confirmations.");
             return;
         }
-        if ("Recent Sales".equals(activeTab) || "Profit Tracker".equals(activeTab) || "Craft Flips".equals(activeTab)) {
-            renderInfo(context, activeTab + " is planned. Main BIN scanning is live.");
+        if ("Recent Sales".equals(activeTab) || "Profit Tracker".equals(activeTab)) {
+            renderInfo(context, activeTab + " will use stored sales history after NBT decoding is added.");
             return;
         }
 
+        renderFilterStrip(context);
         renderTable(context);
         renderDetailPanel(context);
     }
 
-    private void renderInfo(DrawContext context, String message) {
-        int x = SIDEBAR + 14;
-        int y = HEADER + 18;
-        context.fill(x, y, width - 16, height - 16, PANEL);
-        drawText(context, activeTab, x + 12, y + 12, PURPLE);
-        drawText(context, message, x + 12, y + 34, 0xFFE8EAF6);
+    private void renderFilterStrip(DrawContext context) {
+        int x = tableX();
+        int y = HEADER + 12;
+        int right = tableRight();
+        context.fill(x, y, right, y + 26, PANEL_SOFT);
+        FlipRadarConfig config = configManager.get();
+        String filters = "Min profit " + compactCoins(config.minimumProfitCoins)
+                + " | Min " + String.format(Locale.US, "%.0f%%", config.minimumProfitPercent)
+                + " | Conf " + config.minimumConfidencePercent + "%"
+                + " | Vol " + String.format(Locale.US, "%.0f/day", config.minimumVolumePerDay)
+                + " | Max buy " + compactCoins(config.maxPurchasePriceCoins);
+        drawText(context, trim(filters, right - x - 16), x + 8, y + 9, MUTED);
     }
 
     private void renderTable(DrawContext context) {
-        int x = SIDEBAR + 12;
-        int y = HEADER + 16;
+        int x = tableX();
+        int y = tableY();
         int right = tableRight();
-        int bottom = height - 38;
+        int bottom = tableBottom();
         context.fill(x, y, right, bottom, PANEL);
 
-        int widthAvailable = Math.max(260, right - x - 16);
-        int itemW = Math.max(110, widthAvailable - 322);
-        int binX = x + 8 + itemW + 8;
-        int valueX = binX + 78;
-        int profitX = valueX + 86;
-        int pctX = profitX + 84;
-        int confX = pctX + 42;
+        int tableWidth = right - x - 16;
+        int itemW = Math.max(120, tableWidth - 330);
+        int binX = x + 8 + itemW + 10;
+        int valueX = binX + 70;
+        int profitX = valueX + 78;
+        int pctX = profitX + 78;
+        int confX = pctX + 48;
 
-        drawText(context, "Item", x + 8, y + 8, 0xFFFFFFFF);
-        drawText(context, "BIN", binX, y + 8, 0xFFFFFFFF);
-        drawText(context, "Value", valueX, y + 8, 0xFFFFFFFF);
-        drawText(context, "Profit", profitX, y + 8, 0xFFFFFFFF);
-        drawText(context, "%", pctX, y + 8, 0xFFFFFFFF);
-        drawText(context, "Conf", confX, y + 8, 0xFFFFFFFF);
+        drawText(context, "Item", x + 8, y + 10, TEXT);
+        drawText(context, "BIN", binX, y + 10, TEXT);
+        drawText(context, "Est.", valueX, y + 10, TEXT);
+        drawText(context, "Profit", profitX, y + 10, TEXT);
+        drawText(context, "%", pctX, y + 10, TEXT);
+        drawText(context, "Conf", confX, y + 10, TEXT);
 
         List<FlipCandidate> flips = displayedFlips();
         if (flips.isEmpty()) {
             String message = scanner.isScanning()
-                    ? "Scanning... " + scanner.auctionsScanned() + " BIN auctions checked, " + scanner.candidatesFilteredOut() + " filtered."
-                    : "No flips in this tab. Waiting for the next live scan.";
-            drawText(context, trim(message, Math.max(80, right - x - 20)), x + 8, y + 36, 0xFFABB2D6);
-            drawText(context, "Current filters: profit, percent, confidence, volume, and budget.", x + 8, y + 54, 0xFF6F779F);
+                    ? "Scanning live auctions... " + scanner.auctionsScanned() + " checked so far."
+                    : "No flips match these filters yet.";
+            drawText(context, message, x + 10, y + 42, MUTED);
+            drawText(context, "Tip: lower min profit/confidence or wait for the next live scan.", x + 10, y + 60, 0xFF7F87AD);
             return;
         }
 
-        int rowY = y + 25;
-        int maxRows = visibleRows();
-        for (int i = 0; i < maxRows && scrollOffset + i < flips.size(); i++) {
+        int rowY = y + 30;
+        for (int i = 0; i < visibleRows() && scrollOffset + i < flips.size(); i++) {
             int index = scrollOffset + i;
             FlipCandidate flip = flips.get(index);
-            context.fill(x + 1, rowY, right - 1, rowY + 15, index == selectedIndex ? 0xFF2B1E46 : 0x00111111);
-            drawText(context, trim(flip.auction().itemName(), itemW), x + 8, rowY + 4, 0xFFE8EAF6);
-            drawText(context, compactCoins(flip.auction().binPrice()), binX, rowY + 4, 0xFFCED6FF);
-            drawText(context, compactCoins(flip.estimatedMarketValue()), valueX, rowY + 4, 0xFFCED6FF);
-            drawText(context, "+" + compactCoins(flip.profitAfterTax()), profitX, rowY + 4, 0xFF7CFFB2);
-            drawText(context, String.format(Locale.US, "%.0f", flip.profitPercent()), pctX, rowY + 4, 0xFF7CFFB2);
-            drawText(context, flip.confidencePercent() + "%", confX, rowY + 4, 0xFFFFD166);
-            context.fill(x + 1, rowY + 15, right - 1, rowY + 16, LINE);
-            rowY += 16;
+            boolean selected = index == selectedIndex;
+            context.fill(x + 1, rowY, right - 1, rowY + rowHeight() - 1, selected ? ROW_SELECTED : (index % 2 == 0 ? ROW_ALT : PANEL));
+            int estimateColor = suspicious(flip) ? YELLOW : MUTED;
+            drawText(context, trim(flip.auction().itemName(), itemW), x + 8, rowY + 5, TEXT);
+            drawText(context, compactCoins(flip.auction().binPrice()), binX, rowY + 5, MUTED);
+            drawText(context, compactCoins(flip.estimatedMarketValue()), valueX, rowY + 5, estimateColor);
+            drawText(context, "+" + compactCoins(flip.profitAfterTax()), profitX, rowY + 5, suspicious(flip) ? YELLOW : GREEN);
+            drawText(context, percentText(flip.profitPercent()), pctX, rowY + 5, suspicious(flip) ? YELLOW : GREEN);
+            drawText(context, flip.confidencePercent() + "%", confX, rowY + 5, confidenceColor(flip.confidencePercent()));
+            context.fill(x + 1, rowY + rowHeight() - 1, right - 1, rowY + rowHeight(), LINE);
+            rowY += rowHeight();
         }
 
-        if (flips.size() > maxRows) {
-            drawText(context, (scrollOffset + 1) + "-" + Math.min(flips.size(), scrollOffset + maxRows) + " / " + flips.size()
-                    + " | scanned " + scanner.auctionsScanned()
-                    + " | filtered " + scanner.candidatesFilteredOut(), x + 8, bottom + 10, 0xFFABB2D6);
-        } else {
-            drawText(context, "found " + scanner.candidatesFound()
-                    + " | scanned " + scanner.auctionsScanned()
-                    + " | filtered " + scanner.candidatesFilteredOut(), x + 8, bottom + 10, 0xFFABB2D6);
-        }
+        renderFooter(context, x, bottom);
+    }
+
+    private void renderFooter(DrawContext context, int x, int bottom) {
+        List<FlipCandidate> flips = displayedFlips();
+        String text = flips.isEmpty()
+                ? "0 results"
+                : (scrollOffset + 1) + "-" + Math.min(flips.size(), scrollOffset + visibleRows()) + " / " + flips.size();
+        drawText(context, text + " | mouse wheel scroll | click a row for details", x + 8, bottom + 10, MUTED);
     }
 
     private void renderDetailPanel(DrawContext context) {
@@ -244,39 +264,61 @@ public final class FlipRadarScreen extends Screen {
             return;
         }
 
-        int x = width - detailWidth;
-        int y = HEADER + 16;
-        context.fill(x, y, width - 12, height - 38, PANEL);
+        int x = width - detailWidth - 12;
+        int y = HEADER + 12;
+        int bottom = height - 44;
+        context.fill(x, y, width - 12, bottom, PANEL);
         List<FlipCandidate> flips = displayedFlips();
         if (flips.isEmpty()) {
-            drawText(context, "Details", x + 12, y + 12, PURPLE);
+            drawText(context, "Details", x + 14, y + 14, PURPLE);
+            drawText(context, "Select a flip to inspect pricing.", x + 14, y + 34, MUTED);
             return;
         }
 
         FlipCandidate flip = flips.get(Math.min(selectedIndex, flips.size() - 1));
         int textW = detailWidth - 28;
-        int line = y + 12;
-        drawText(context, trim(flip.auction().itemName(), textW), x + 12, line, PURPLE);
+        int line = y + 14;
+        drawText(context, trim(flip.auction().itemName(), textW), x + 14, line, PURPLE);
         line += 20;
-        drawText(context, "Rarity: " + flip.auction().tier(), x + 12, line, 0xFFABB2D6);
+        drawText(context, "Rarity " + flip.auction().tier(), x + 14, line, MUTED);
+        line += 18;
+        context.fill(x + 12, line, width - 24, line + 1, LINE);
+        line += 12;
+
+        line = metric(context, x, line, "BIN", coinText(flip.auction().binPrice()), MUTED);
+        line = metric(context, x, line, "Estimated value", coinText(flip.estimatedMarketValue()), suspicious(flip) ? YELLOW : TEXT);
+        line = metric(context, x, line, "Auction tax", coinText(flip.estimatedAuctionTax()), MUTED);
+        line = metric(context, x, line, "Profit", "+" + coinText(flip.profitAfterTax()), suspicious(flip) ? YELLOW : GREEN);
+        line = metric(context, x, line, "Profit percent", percentText(flip.profitPercent()) + "%", suspicious(flip) ? YELLOW : GREEN);
+        line = metric(context, x, line, "Confidence", flip.confidencePercent() + "%", confidenceColor(flip.confidencePercent()));
+        line = metric(context, x, line, "Volume", String.format(Locale.US, "%.0f/day", flip.volumePerDay()), MUTED);
+        line = metric(context, x, line, "Age", flip.ageMinutes() + "m", flip.ageMinutes() > configManager.get().maxAuctionAgeMinutes ? YELLOW : MUTED);
+
+        line += 8;
+        drawText(context, "Pricing basis", x + 14, line, TEXT);
         line += 16;
-        drawText(context, "BIN: " + coinText(flip.auction().binPrice()), x + 12, line, 0xFFE8EAF6);
+        String basis = "Lowest comparable BIN cluster. Outliers ignored.";
+        drawText(context, trim(basis, textW), x + 14, line, MUTED);
         line += 16;
-        drawText(context, "Value: " + coinText(flip.estimatedMarketValue()), x + 12, line, 0xFFE8EAF6);
-        line += 16;
-        drawText(context, "Tax: " + coinText(flip.estimatedAuctionTax()), x + 12, line, 0xFFE8EAF6);
-        line += 16;
-        drawText(context, "Profit: +" + coinText(flip.profitAfterTax()), x + 12, line, 0xFF7CFFB2);
-        line += 16;
-        drawText(context, "Profit %: " + String.format(Locale.US, "%.1f%%", flip.profitPercent()), x + 12, line, 0xFF7CFFB2);
-        line += 16;
-        drawText(context, "Confidence: " + flip.confidencePercent() + "%", x + 12, line, 0xFFFFD166);
-        line += 16;
-        drawText(context, "Volume: " + String.format(Locale.US, "%.0f/day", flip.volumePerDay()), x + 12, line, 0xFFABB2D6);
-        line += 16;
-        drawText(context, "Age: " + flip.ageMinutes() + "m", x + 12, line, 0xFFABB2D6);
-        line += 22;
-        drawText(context, trim("Manual only. Inspect before buying.", textW), x + 12, line, 0xFFFFD166);
+        if (suspicious(flip)) {
+            drawText(context, trim("Warning: estimate is unusually high. Inspect manually.", textW), x + 14, line, YELLOW);
+            line += 16;
+        }
+        drawText(context, trim("Manual only. No buying or slot clicking.", textW), x + 14, Math.min(line + 8, bottom - 22), YELLOW);
+    }
+
+    private int metric(DrawContext context, int x, int y, String label, String value, int valueColor) {
+        drawText(context, label, x + 14, y, 0xFF7F87AD);
+        drawRightText(context, value, width - 28, y, valueColor);
+        return y + 16;
+    }
+
+    private void renderInfo(DrawContext context, String message) {
+        int x = tableX();
+        int y = HEADER + 12;
+        context.fill(x, y, width - 12, height - 16, PANEL);
+        drawText(context, activeTab, x + 14, y + 14, PURPLE);
+        drawText(context, message, x + 14, y + 36, TEXT);
     }
 
     private List<FlipCandidate> displayedFlips() {
@@ -296,22 +338,57 @@ public final class FlipRadarScreen extends Screen {
         return flips;
     }
 
-    private int detailWidth() {
-        return width >= 720 ? Math.min(250, Math.max(190, width / 4)) : 0;
+    private int tableX() {
+        return SIDEBAR + 14;
+    }
+
+    private int tableY() {
+        return HEADER + 46;
     }
 
     private int tableRight() {
         int detailWidth = detailWidth();
-        return detailWidth > 0 ? width - detailWidth - 12 : width - 12;
+        return detailWidth > 0 ? width - detailWidth - 26 : width - 14;
+    }
+
+    private int tableBottom() {
+        return height - 34;
+    }
+
+    private int detailWidth() {
+        return width >= 780 ? Math.min(270, Math.max(220, width / 4)) : 0;
+    }
+
+    private int rowHeight() {
+        return 18;
     }
 
     private int visibleRows() {
-        return Math.max(1, (height - (HEADER + 16 + 25) - 48) / 16);
+        return Math.max(1, (tableBottom() - (tableY() + 30)) / rowHeight());
+    }
+
+    private int confidenceColor(int confidence) {
+        if (confidence >= 80) {
+            return GREEN;
+        }
+        if (confidence >= 65) {
+            return YELLOW;
+        }
+        return RED;
+    }
+
+    private boolean suspicious(FlipCandidate flip) {
+        return flip.profitPercent() > 250.0D || flip.estimatedMarketValue() > flip.auction().binPrice() * 4L;
     }
 
     private void drawText(DrawContext context, String value, int x, int y, int color) {
         MinecraftClient minecraft = MinecraftClient.getInstance();
         context.drawText(minecraft.textRenderer, Text.literal(value), x, y, color, false);
+    }
+
+    private void drawRightText(DrawContext context, String value, int rightX, int y, int color) {
+        MinecraftClient minecraft = MinecraftClient.getInstance();
+        context.drawText(minecraft.textRenderer, Text.literal(value), rightX - minecraft.textRenderer.getWidth(value), y, color, false);
     }
 
     private String trim(String value, int maxWidth) {
@@ -327,12 +404,22 @@ public final class FlipRadarScreen extends Screen {
         return COINS.format(coins);
     }
 
+    private String percentText(double percent) {
+        if (percent >= 1000.0D) {
+            return "999+";
+        }
+        return String.format(Locale.US, "%.0f", percent);
+    }
+
     private String compactCoins(long coins) {
         if (coins >= 1_000_000_000L) {
-            return String.format(Locale.US, "%.1fb", coins / 1_000_000_000.0D);
+            return String.format(Locale.US, "%.2fb", coins / 1_000_000_000.0D);
+        }
+        if (coins >= 10_000_000L) {
+            return String.format(Locale.US, "%.1fm", coins / 1_000_000.0D);
         }
         if (coins >= 1_000_000L) {
-            return String.format(Locale.US, "%.1fm", coins / 1_000_000.0D);
+            return String.format(Locale.US, "%.2fm", coins / 1_000_000.0D);
         }
         if (coins >= 1_000L) {
             return String.format(Locale.US, "%.0fk", coins / 1_000.0D);

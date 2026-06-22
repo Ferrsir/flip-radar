@@ -62,6 +62,6 @@ public final class MarketValueEstimator {
         return signature.contains("recombobulated")
                 || signature.contains("gemstones")
                 || signature.contains("attributes")
-                || signature.contains("enchants:");
+                || !signature.contains("enchants:0");
     }
 }
