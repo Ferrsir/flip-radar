@@ -53,6 +53,9 @@ public final class FlipRadarClient implements ClientModInitializer {
             if (client.player == null) {
                 return;
             }
+
+            scanner.refreshIfDue();
+
             for (FlipCandidate candidate : scanner.consumeNewAlerts()) {
                 client.player.sendMessage(alertText(candidate), false);
             }

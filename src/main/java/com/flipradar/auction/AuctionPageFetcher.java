@@ -35,11 +35,23 @@ public final class AuctionPageFetcher {
         return auctions;
     }
 
+    public Optional<PageResult> fetchPage(int page) {
+        return apiClient.getAuctionPage(page).map(json -> {
+            List<AuctionItem> auctions = new ArrayList<>();
+            parseInto(auctions, json);
+            int totalPages = json.has("totalPages") ? json.get("totalPages").getAsInt() : page + 1;
+            return new PageResult(page, totalPages, auctions);
+        });
+    }
+
     private void parseInto(List<AuctionItem> auctions, JsonObject page) {
         JsonArray array = page.getAsJsonArray("auctions");
         if (array == null) {
             return;
         }
         array.forEach(element -> parser.parse(element.getAsJsonObject()).ifPresent(auctions::add));
+    }
+
+    public record PageResult(int page, int totalPages, List<AuctionItem> auctions) {
     }
 }

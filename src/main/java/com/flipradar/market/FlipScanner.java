@@ -27,7 +27,13 @@ public final class FlipScanner {
     private volatile List<FlipCandidate> latest = List.of();
     private volatile List<FlipCandidate> newAlerts = List.of();
     private volatile Instant lastScan = Instant.EPOCH;
+    private volatile Instant scanStarted = Instant.EPOCH;
     private volatile String apiStatus = "Idle";
+    private volatile int currentPage = 0;
+    private volatile int totalPages = 0;
+    private volatile int auctionsScanned = 0;
+    private volatile int candidatesFound = 0;
+    private volatile int candidatesFilteredOut = 0;
     private final Set<String> alertedAuctions = new HashSet<>();
 
     public FlipScanner(AuctionPageFetcher pageFetcher, LocalCache cache, ConfigManager configManager) {
@@ -39,32 +45,41 @@ public final class FlipScanner {
         if (!scanning.compareAndSet(false, true)) {
             return;
         }
+        scanStarted = Instant.now();
         apiStatus = "Scanning";
-        CompletableFuture.runAsync(() -> {
-            try {
-                List<AuctionItem> auctions = pageFetcher.fetchBinAuctions(configManager.get().scanPageLimit);
-                List<FlipCandidate> candidates = new ArrayList<>();
-                for (AuctionItem auction : auctions) {
-                    long value = estimator.estimate(auction, auctions);
-                    long tax = profitCalculator.taxFor(value);
-                    long profit = profitCalculator.profitAfterTax(value, auction.binPrice());
-                    double profitPercent = profitCalculator.profitPercent(profit, auction.binPrice());
-                    int confidence = confidenceScorer.score(auction, value, profitPercent, auctions);
-                    int ageMinutes = (int) Math.max(0, Duration.between(auction.start(), Instant.now()).toMinutes());
-                    double volume = Math.min(100.0D, auctions.stream().filter(a -> a.signature().equals(auction.signature())).count() * 2.0D);
+        currentPage = 0;
+        totalPages = Math.max(1, configManager.get().scanPageLimit);
+        auctionsScanned = 0;
+        candidatesFound = 0;
+        candidatesFilteredOut = 0;
 
-                    FlipCandidate candidate = new FlipCandidate(auction, value, tax, profit, profitPercent, confidence, volume, ageMinutes);
-                    if (filter.include(candidate, configManager.get())) {
-                        candidates.add(candidate);
+        CompletableFuture.runAsync(() -> {
+            List<AuctionItem> auctions = new ArrayList<>();
+            try {
+                int pageLimit = Math.max(1, configManager.get().scanPageLimit);
+                for (int page = 0; page < pageLimit; page++) {
+                    int pageIndex = page;
+                    pageFetcher.fetchPage(pageIndex).ifPresent(result -> {
+                        totalPages = Math.min(pageLimit, result.totalPages());
+                        auctions.addAll(result.auctions());
+                        auctionsScanned = auctions.size();
+                        currentPage = pageIndex + 1;
+                    });
+
+                    if (auctions.isEmpty()) {
+                        continue;
+                    }
+
+                    if (page % 2 == 1 || page == pageLimit - 1 || currentPage >= totalPages) {
+                        publishCandidates(auctions);
+                    }
+
+                    if (currentPage >= totalPages) {
+                        break;
                     }
                 }
 
-                List<FlipCandidate> sorted = candidates.stream()
-                        .sorted(Comparator.comparingLong(FlipCandidate::profitAfterTax).reversed())
-                        .limit(configManager.get().maxFlipResults)
-                        .toList();
-                latest = sorted;
-                newAlerts = collectNewAlerts(sorted);
+                publishCandidates(auctions);
                 lastScan = Instant.now();
                 apiStatus = "OK";
             } catch (Exception exception) {
@@ -73,6 +88,17 @@ public final class FlipScanner {
                 scanning.set(false);
             }
         });
+    }
+
+    public void refreshIfDue() {
+        if (scanning.get()) {
+            return;
+        }
+
+        int interval = Math.max(60, configManager.get().refreshIntervalSeconds);
+        if (lastScan.equals(Instant.EPOCH) || lastScan.plusSeconds(interval).isBefore(Instant.now())) {
+            refreshAsync();
+        }
     }
 
     public List<FlipCandidate> latest() {
@@ -89,6 +115,26 @@ public final class FlipScanner {
 
     public boolean isScanning() {
         return scanning.get();
+    }
+
+    public int currentPage() {
+        return currentPage;
+    }
+
+    public int totalPages() {
+        return totalPages;
+    }
+
+    public int auctionsScanned() {
+        return auctionsScanned;
+    }
+
+    public int candidatesFound() {
+        return candidatesFound;
+    }
+
+    public int candidatesFilteredOut() {
+        return candidatesFilteredOut;
     }
 
     public synchronized List<FlipCandidate> consumeNewAlerts() {
@@ -110,5 +156,38 @@ public final class FlipScanner {
             }
         }
         return alerts;
+    }
+
+    private void publishCandidates(List<AuctionItem> auctions) {
+        List<FlipCandidate> candidates = new ArrayList<>();
+        int filtered = 0;
+        List<AuctionItem> snapshot = List.copyOf(auctions);
+
+        for (AuctionItem auction : snapshot) {
+            long value = estimator.estimate(auction, snapshot);
+            long tax = profitCalculator.taxFor(value);
+            long profit = profitCalculator.profitAfterTax(value, auction.binPrice());
+            double profitPercent = profitCalculator.profitPercent(profit, auction.binPrice());
+            int confidence = confidenceScorer.score(auction, value, profitPercent, snapshot);
+            int ageMinutes = (int) Math.max(0, Duration.between(auction.start(), Instant.now()).toMinutes());
+            double volume = Math.min(100.0D, snapshot.stream().filter(a -> a.signature().equals(auction.signature())).count() * 2.0D);
+
+            FlipCandidate candidate = new FlipCandidate(auction, value, tax, profit, profitPercent, confidence, volume, ageMinutes);
+            if (filter.include(candidate, configManager.get())) {
+                candidates.add(candidate);
+            } else {
+                filtered++;
+            }
+        }
+
+        List<FlipCandidate> sorted = candidates.stream()
+                .sorted(Comparator.comparingLong(FlipCandidate::profitAfterTax).reversed())
+                .limit(configManager.get().maxFlipResults)
+                .toList();
+
+        latest = sorted;
+        newAlerts = collectNewAlerts(sorted);
+        candidatesFound = sorted.size();
+        candidatesFilteredOut = filtered;
     }
 }

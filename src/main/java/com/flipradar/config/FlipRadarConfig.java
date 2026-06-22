@@ -25,7 +25,7 @@ public final class FlipRadarConfig {
     public boolean showDesktopNotifications = false;
     public boolean playSoundOnHighConfidenceDeal = false;
     public boolean confirmBeforeOpeningAuction = true;
-    public int scanPageLimit = 40;
-    public int maxFlipResults = 250;
+    public int scanPageLimit = 60;
+    public int maxFlipResults = 500;
     public int maxChatAlertsPerScan = 5;
 }

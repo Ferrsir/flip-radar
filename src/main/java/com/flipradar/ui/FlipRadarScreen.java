@@ -145,9 +145,11 @@ public final class FlipRadarScreen extends Screen {
     private void renderHeader(DrawContext context) {
         context.fill(SIDEBAR, 0, width, HEADER, 0xFF101422);
         drawText(context, "FLIP RADAR", SIDEBAR + 14, 12, PURPLE);
-        drawText(context, "Manual BIN scan", SIDEBAR + 14, 30, 0xFFABB2D6);
+        drawText(context, scanner.isScanning() ? "Live BIN scan running" : "Live BIN scan idle", SIDEBAR + 14, 30, 0xFFABB2D6);
 
-        String status = "API: " + scanner.apiStatus();
+        String status = scanner.isScanning()
+                ? "API: page " + scanner.currentPage() + "/" + Math.max(scanner.currentPage(), scanner.totalPages())
+                : "API: " + scanner.apiStatus();
         drawText(context, status, Math.max(SIDEBAR + 220, width - 220), 30, "OK".equals(scanner.apiStatus()) ? 0xFF7CFFB2 : 0xFFFFD166);
         if (!scanner.lastScan().equals(java.time.Instant.EPOCH)) {
             String time = DateTimeFormatter.ofPattern("HH:mm:ss").withZone(ZoneId.systemDefault()).format(scanner.lastScan());
@@ -201,7 +203,11 @@ public final class FlipRadarScreen extends Screen {
 
         List<FlipCandidate> flips = displayedFlips();
         if (flips.isEmpty()) {
-            drawText(context, "No flips in this tab. Run /fr and press Refresh.", x + 8, y + 36, 0xFFABB2D6);
+            String message = scanner.isScanning()
+                    ? "Scanning... " + scanner.auctionsScanned() + " BIN auctions checked, " + scanner.candidatesFilteredOut() + " filtered."
+                    : "No flips in this tab. Waiting for the next live scan.";
+            drawText(context, trim(message, Math.max(80, right - x - 20)), x + 8, y + 36, 0xFFABB2D6);
+            drawText(context, "Current filters: profit, percent, confidence, volume, and budget.", x + 8, y + 54, 0xFF6F779F);
             return;
         }
 
@@ -222,7 +228,13 @@ public final class FlipRadarScreen extends Screen {
         }
 
         if (flips.size() > maxRows) {
-            drawText(context, (scrollOffset + 1) + "-" + Math.min(flips.size(), scrollOffset + maxRows) + " / " + flips.size(), x + 8, bottom + 10, 0xFFABB2D6);
+            drawText(context, (scrollOffset + 1) + "-" + Math.min(flips.size(), scrollOffset + maxRows) + " / " + flips.size()
+                    + " | scanned " + scanner.auctionsScanned()
+                    + " | filtered " + scanner.candidatesFilteredOut(), x + 8, bottom + 10, 0xFFABB2D6);
+        } else {
+            drawText(context, "found " + scanner.candidatesFound()
+                    + " | scanned " + scanner.auctionsScanned()
+                    + " | filtered " + scanner.candidatesFilteredOut(), x + 8, bottom + 10, 0xFFABB2D6);
         }
     }
 
