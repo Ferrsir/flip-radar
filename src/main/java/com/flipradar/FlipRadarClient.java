@@ -13,12 +13,14 @@ import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.util.InputUtil;
+import net.minecraft.util.Identifier;
 import org.lwjgl.glfw.GLFW;
 
 import java.nio.file.Path;
 
 public final class FlipRadarClient implements ClientModInitializer {
     public static final String MOD_ID = "flipradar";
+    private static final KeyBinding.Category KEY_CATEGORY = KeyBinding.Category.create(Identifier.of(MOD_ID, "main"));
 
     private KeyBinding openKey;
     private FlipScanner scanner;
@@ -40,7 +42,7 @@ public final class FlipRadarClient implements ClientModInitializer {
                 "key.flipradar.open",
                 InputUtil.Type.KEYSYM,
                 GLFW.GLFW_KEY_R,
-                "category.flipradar"
+                KEY_CATEGORY
         ));
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {

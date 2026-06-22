@@ -5,6 +5,7 @@ out/
 *.iml
 .idea/
 .vscode/
+.tools/
 *.log
 hs_err_pid*
 replay_pid*
