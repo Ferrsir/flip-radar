@@ -71,13 +71,21 @@ public final class FlipRadarClient implements ClientModInitializer {
 
     private Text alertText(FlipCandidate candidate) {
         String command = "/viewauction " + candidate.auction().uuid();
+        String itemName = trim(candidate.auction().itemName(), 36);
         MutableText prefix = Text.literal("[FlipRadar] ").formatted(Formatting.DARK_PURPLE);
-        MutableText body = Text.literal("flip +" + COINS.format(candidate.profitAfterTax()) + " ").formatted(Formatting.GREEN);
+        MutableText body = Text.literal(itemName + " +" + COINS.format(candidate.profitAfterTax()) + " ").formatted(Formatting.GREEN);
         MutableText link = Text.literal("[click here to open]")
                 .formatted(Formatting.LIGHT_PURPLE, Formatting.UNDERLINE)
                 .styled(style -> style
                         .withClickEvent(new ClickEvent.RunCommand(command))
                         .withHoverEvent(new HoverEvent.ShowText(Text.literal("Open auction manually. You still inspect and buy."))));
         return prefix.append(body).append(link);
+    }
+
+    private String trim(String value, int maxLength) {
+        if (value.length() <= maxLength) {
+            return value;
+        }
+        return value.substring(0, Math.max(0, maxLength - 3)) + "...";
     }
 }

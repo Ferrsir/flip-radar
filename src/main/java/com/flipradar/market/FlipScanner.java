@@ -35,6 +35,7 @@ public final class FlipScanner {
     private volatile int candidatesFound = 0;
     private volatile int candidatesFilteredOut = 0;
     private final Set<String> alertedAuctions = new HashSet<>();
+    private final Set<String> alertedSignatures = new HashSet<>();
 
     public FlipScanner(AuctionPageFetcher pageFetcher, LocalCache cache, ConfigManager configManager) {
         this.pageFetcher = pageFetcher;
@@ -151,7 +152,8 @@ public final class FlipScanner {
                 break;
             }
             String uuid = candidate.auction().uuid().toString();
-            if (alertedAuctions.add(uuid)) {
+            String signature = candidate.auction().signature();
+            if (alertedAuctions.add(uuid) && alertedSignatures.add(signature)) {
                 alerts.add(candidate);
             }
         }

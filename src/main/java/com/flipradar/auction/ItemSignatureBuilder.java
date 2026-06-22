@@ -7,6 +7,7 @@ import java.util.regex.Pattern;
 
 public final class ItemSignatureBuilder {
     private static final Pattern PET_LEVEL = Pattern.compile("\\[(?:lvl|level)\\s*(\\d{1,3})]", Pattern.CASE_INSENSITIVE);
+    private static final Pattern ENCHANT_LINE = Pattern.compile("\\b([A-Z][A-Za-z' -]+)\\s+(I|II|III|IV|V|VI|VII|VIII|IX|X)\\b");
 
     public String build(String itemName, String lore, String tier, String itemBytes) {
         String normalizedName = normalize(itemName);
@@ -31,7 +32,8 @@ public final class ItemSignatureBuilder {
         }
 
         int stars = countStars(itemName + " " + lore);
-        return normalizedName + "|" + tier.toLowerCase(Locale.ROOT) + petLevelBucket + "|stars:" + stars + modifiers;
+        int enchantWeight = enchantWeight(lore);
+        return normalizedName + "|" + tier.toLowerCase(Locale.ROOT) + petLevelBucket + "|stars:" + stars + "|enchants:" + enchantWeight + modifiers;
     }
 
     private String petLevelBucket(String normalizedName) {
@@ -56,6 +58,31 @@ public final class ItemSignatureBuilder {
             }
         }
         return count;
+    }
+
+    private int enchantWeight(String lore) {
+        Matcher matcher = ENCHANT_LINE.matcher(lore == null ? "" : lore.replaceAll("Â§.", ""));
+        int weight = 0;
+        while (matcher.find()) {
+            weight += romanValue(matcher.group(2));
+        }
+        return Math.min(20, weight / 3);
+    }
+
+    private int romanValue(String roman) {
+        return switch (roman) {
+            case "I" -> 1;
+            case "II" -> 2;
+            case "III" -> 3;
+            case "IV" -> 4;
+            case "V" -> 5;
+            case "VI" -> 6;
+            case "VII" -> 7;
+            case "VIII" -> 8;
+            case "IX" -> 9;
+            case "X" -> 10;
+            default -> 0;
+        };
     }
 
     private String normalize(String value) {
