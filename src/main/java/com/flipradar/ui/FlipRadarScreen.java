@@ -13,6 +13,7 @@ import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.text.Text;
 
 import java.text.NumberFormat;
+import java.util.ArrayList;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -61,7 +62,7 @@ public final class FlipRadarScreen extends Screen {
             rebuild();
         }).dimensions(headerX + headerW - 106, TOP + 14, 96, 22).build());
 
-        if (!displayedFlips().isEmpty() && rightW() > 0) {
+        if (!displayedFlips().isEmpty() && showRightPanel()) {
             addDrawableChild(ButtonWidget.builder(Text.literal("Open Auction"), button -> {
                 List<FlipCandidate> flips = displayedFlips();
                 FlipCandidate candidate = flips.get(Math.min(selectedIndex, flips.size() - 1));
@@ -86,6 +87,7 @@ public final class FlipRadarScreen extends Screen {
         renderRightPanel(context);
         renderBottomBar(context);
         super.render(context, mouseX, mouseY, delta);
+        renderHoverTooltip(context, mouseX, mouseY);
     }
 
     @Override
@@ -301,7 +303,7 @@ public final class FlipRadarScreen extends Screen {
     }
 
     private void renderRightPanel(DrawContext context) {
-        if (rightW() <= 0) {
+        if (!showRightPanel()) {
             return;
         }
         int x = rightX();
@@ -375,6 +377,37 @@ public final class FlipRadarScreen extends Screen {
         drawRight(context, "Next API refresh: " + Math.max(0, configManager.get().refreshIntervalSeconds) + "s", width - 18, y + 10, MUTED);
     }
 
+    private void renderHoverTooltip(DrawContext context, int mouseX, int mouseY) {
+        FlipCandidate flip = hoveredFlip(mouseX, mouseY);
+        if (flip == null) {
+            return;
+        }
+
+        List<Text> lines = new ArrayList<>();
+        lines.add(Text.literal(flip.auction().itemName()));
+        lines.add(Text.literal("BIN: " + coinText(flip.auction().binPrice())));
+        lines.add(Text.literal("Estimate: " + coinText(flip.estimatedMarketValue())));
+        lines.add(Text.literal("Profit: +" + coinText(flip.profitAfterTax()) + " (" + percentText(flip.profitPercent()) + "%)"));
+        lines.add(Text.literal("Confidence: " + flip.confidencePercent() + "% | Volume: " + String.format(Locale.US, "%.0f/day", flip.volumePerDay())));
+        lines.add(Text.literal("Click row to select. Open auction is manual only."));
+        context.drawTooltip(textRenderer, lines, mouseX, mouseY);
+    }
+
+    private FlipCandidate hoveredFlip(int mouseX, int mouseY) {
+        int rowTop = tableY() + 28;
+        if (mouseX < tableX() || mouseX > tableRight() || mouseY < rowTop || mouseY > tableBottom()) {
+            return null;
+        }
+
+        int row = (mouseY - rowTop) / rowH();
+        int index = scrollOffset + row;
+        List<FlipCandidate> flips = displayedFlips();
+        if (index < 0 || index >= flips.size()) {
+            return null;
+        }
+        return flips.get(index);
+    }
+
     private void renderInfo(DrawContext context, String message) {
         panel(context, mainX(), TOP + 64, mainW(), height - 112);
         drawText(context, activeTab, mainX() + 16, TOP + 82, PURPLE);
@@ -426,8 +459,12 @@ public final class FlipRadarScreen extends Screen {
         return width - SIDEBAR - rightW() - GAP * 3;
     }
 
+    private boolean showRightPanel() {
+        return width >= 1250 && height >= 520;
+    }
+
     private int rightW() {
-        return width >= 900 ? Math.min(280, Math.max(230, width / 4)) : 0;
+        return showRightPanel() ? Math.min(260, Math.max(220, width / 5)) : 0;
     }
 
     private int rightX() {
@@ -447,7 +484,7 @@ public final class FlipRadarScreen extends Screen {
     }
 
     private int tableBottom() {
-        int preferred = compactMode() ? height - 42 : height - 122;
+        int preferred = height - 64;
         return Math.max(tableY() + 100, preferred);
     }
 
@@ -460,31 +497,31 @@ public final class FlipRadarScreen extends Screen {
     }
 
     private boolean compactMode() {
-        return height < 420 || mainW() < 560;
+        return height < 520 || mainW() < 680;
     }
 
     private int colBin() {
-        return Math.max(190, mainW() - 360);
+        return Math.max(190, mainW() - (compactMode() ? 330 : 430));
     }
 
     private int colValue() {
-        return colBin() + 82;
+        return colBin() + (compactMode() ? 78 : 92);
     }
 
     private int colProfit() {
-        return colValue() + 90;
+        return colValue() + (compactMode() ? 82 : 96);
     }
 
     private int colPct() {
-        return colProfit() + 78;
+        return colProfit() + (compactMode() ? 72 : 86);
     }
 
     private int colConf() {
-        return colPct() + 58;
+        return colPct() + (compactMode() ? 54 : 64);
     }
 
     private int colVol() {
-        return colConf() + 48;
+        return colConf() + 52;
     }
 
     private int countHighProfit() {
