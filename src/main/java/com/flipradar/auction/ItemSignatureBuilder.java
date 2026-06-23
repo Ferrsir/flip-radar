@@ -10,6 +10,14 @@ public final class ItemSignatureBuilder {
     private static final Pattern ENCHANT_LINE = Pattern.compile("\\b([A-Z][A-Za-z' -]+)\\s+(I|II|III|IV|V|VI|VII|VIII|IX|X)\\b");
 
     public String build(String itemName, String lore, String tier, String itemBytes) {
+        return build(itemName, lore, tier, itemBytes, SkyBlockItemData.unknown());
+    }
+
+    public String build(String itemName, String lore, String tier, String itemBytes, SkyBlockItemData itemData) {
+        if (itemData.hasNbtIdentity()) {
+            return buildFromNbt(itemName, tier, itemData);
+        }
+
         String normalizedName = normalize(itemName);
         String petLevelBucket = petLevelBucket(normalizedName);
         normalizedName = normalizedName
@@ -34,6 +42,41 @@ public final class ItemSignatureBuilder {
         int stars = countStars(itemName + " " + lore);
         int enchantWeight = enchantWeight(lore);
         return normalizedName + "|" + tier.toLowerCase(Locale.ROOT) + petLevelBucket + "|stars:" + stars + "|enchants:" + enchantWeight + modifiers;
+    }
+
+    private String buildFromNbt(String itemName, String tier, SkyBlockItemData itemData) {
+        StringBuilder signature = new StringBuilder();
+        signature.append("id:").append(itemData.skyBlockId());
+        signature.append("|tier:").append(tier.toLowerCase(Locale.ROOT));
+
+        if (!itemData.petType().isBlank()) {
+            signature.append("|pet:").append(itemData.petType().toLowerCase(Locale.ROOT));
+            signature.append("|pet-tier:").append(itemData.petTier().toLowerCase(Locale.ROOT));
+            signature.append(itemData.petLevel() >= 100 ? "|pet-level:100" : "|pet-level:1");
+        }
+
+        signature.append("|stars:").append(itemData.dungeonStars());
+        signature.append("|recomb:").append(itemData.recombobulated());
+        signature.append("|hpb:").append(Math.min(15, itemData.hotPotatoBooks()));
+
+        if (!itemData.enchants().isEmpty()) {
+            signature.append("|enchants:");
+            itemData.enchants().forEach((key, value) -> signature.append(key).append('=').append(value).append(','));
+        } else {
+            signature.append("|enchants:0");
+        }
+
+        if (!itemData.gemstones().isEmpty()) {
+            signature.append("|gems:");
+            itemData.gemstones().forEach((key, value) -> signature.append(key).append('=').append(value).append(','));
+        }
+
+        if (!itemData.attributes().isEmpty()) {
+            signature.append("|attributes:");
+            itemData.attributes().forEach((key, value) -> signature.append(key).append('=').append(value).append(','));
+        }
+
+        return signature.toString();
     }
 
     private String petLevelBucket(String normalizedName) {

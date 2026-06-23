@@ -13,6 +13,7 @@ public record AuctionItem(
         long binPrice,
         Instant start,
         Instant end,
-        String signature
+        String signature,
+        SkyBlockItemData itemData
 ) {
 }

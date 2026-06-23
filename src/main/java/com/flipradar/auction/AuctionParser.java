@@ -9,6 +9,7 @@ import java.util.UUID;
 
 public final class AuctionParser {
     private final ItemSignatureBuilder signatureBuilder = new ItemSignatureBuilder();
+    private final SkyBlockItemDataDecoder itemDataDecoder = new SkyBlockItemDataDecoder();
 
     public Optional<AuctionItem> parse(JsonObject auction) {
         if (!auction.has("bin") || !auction.get("bin").getAsBoolean()) {
@@ -31,9 +32,10 @@ public final class AuctionParser {
         long price = longValue(auction, "starting_bid", 0L);
         Instant start = Instant.ofEpochMilli(longValue(auction, "start", System.currentTimeMillis()));
         Instant end = Instant.ofEpochMilli(longValue(auction, "end", System.currentTimeMillis()));
-        String signature = signatureBuilder.build(name, lore, tier, itemBytes);
+        SkyBlockItemData itemData = itemDataDecoder.decode(itemBytes);
+        String signature = signatureBuilder.build(name, lore, tier, itemBytes, itemData);
 
-        return Optional.of(new AuctionItem(parseUuid(uuidText), seller, name, lore, itemBytes, tier, price, start, end, signature));
+        return Optional.of(new AuctionItem(parseUuid(uuidText), seller, name, lore, itemBytes, tier, price, start, end, signature, itemData));
     }
 
     private String stringValue(JsonObject object, String key, String fallback) {

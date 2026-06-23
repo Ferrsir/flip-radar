@@ -15,6 +15,7 @@ import java.util.Optional;
 
 public final class HypixelApiClient {
     private static final String AUCTIONS_URL = "https://api.hypixel.net/v2/skyblock/auctions?page=";
+    private static final String BAZAAR_URL = "https://api.hypixel.net/v2/skyblock/bazaar";
 
     private final HttpClient client = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
@@ -33,6 +34,37 @@ public final class HypixelApiClient {
         }
 
         HttpRequest request = HttpRequest.newBuilder(URI.create(AUCTIONS_URL + page))
+                .timeout(Duration.ofSeconds(20))
+                .header("User-Agent", "FlipRadar/0.1.0 manual informational SkyBlock mod")
+                .GET()
+                .build();
+
+        try {
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() == 200) {
+                cache.write(cacheKey, response.body(), Instant.now());
+                return Optional.of(JsonParser.parseString(response.body()).getAsJsonObject());
+            }
+            if (response.statusCode() == 429) {
+                return cache.readAny(cacheKey).map(body -> JsonParser.parseString(body).getAsJsonObject());
+            }
+        } catch (IOException | InterruptedException ignored) {
+            if (ignored instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+        }
+
+        return cache.readAny(cacheKey).map(body -> JsonParser.parseString(body).getAsJsonObject());
+    }
+
+    public Optional<JsonObject> getBazaar() {
+        String cacheKey = "bazaar.json";
+        Optional<String> cached = cache.readFresh(cacheKey, Duration.ofMinutes(5));
+        if (cached.isPresent()) {
+            return Optional.of(JsonParser.parseString(cached.get()).getAsJsonObject());
+        }
+
+        HttpRequest request = HttpRequest.newBuilder(URI.create(BAZAAR_URL))
                 .timeout(Duration.ofSeconds(20))
                 .header("User-Agent", "FlipRadar/0.1.0 manual informational SkyBlock mod")
                 .GET()

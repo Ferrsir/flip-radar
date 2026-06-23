@@ -9,8 +9,9 @@ It is informational only. It fetches public Hypixel auction data, estimates pote
 - Fetches active SkyBlock auction pages from the official Hypixel Public API.
 - Filters to Buy It Now auctions.
 - Caches auction data locally to reduce API pressure.
-- Builds item signatures for comparable pricing.
-- Estimates market value from locally observed lowest BIN samples.
+- Decodes auction `item_bytes` NBT and builds item signatures from SkyBlock `ExtraAttributes`.
+- Estimates market value from exact/near-exact NBT comparable active BIN samples.
+- Uses Bazaar prices as a conservative fallback for known components such as recombobulators and potato books.
 - Calculates estimated auction tax, profit, profit percent, and confidence.
 - Filters flips by budget and user settings.
 - Shows results in a dark neon-purple in-game screen.

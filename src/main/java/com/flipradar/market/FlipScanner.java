@@ -18,7 +18,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class FlipScanner {
     private final AuctionPageFetcher pageFetcher;
     private final ConfigManager configManager;
-    private final MarketValueEstimator estimator = new MarketValueEstimator();
+    private final BazaarPriceIndex bazaarPriceIndex;
+    private final MarketValueEstimator estimator;
     private final ProfitCalculator profitCalculator = new ProfitCalculator();
     private final ConfidenceScorer confidenceScorer = new ConfidenceScorer();
     private final FlipFilter filter = new FlipFilter();
@@ -37,9 +38,11 @@ public final class FlipScanner {
     private final Set<String> alertedAuctions = new HashSet<>();
     private final Set<String> alertedSignatures = new HashSet<>();
 
-    public FlipScanner(AuctionPageFetcher pageFetcher, LocalCache cache, ConfigManager configManager) {
+    public FlipScanner(AuctionPageFetcher pageFetcher, LocalCache cache, ConfigManager configManager, BazaarPriceIndex bazaarPriceIndex) {
         this.pageFetcher = pageFetcher;
         this.configManager = configManager;
+        this.bazaarPriceIndex = bazaarPriceIndex;
+        this.estimator = new MarketValueEstimator(bazaarPriceIndex);
     }
 
     public void refreshAsync() {
@@ -57,6 +60,7 @@ public final class FlipScanner {
         CompletableFuture.runAsync(() -> {
             List<AuctionItem> auctions = new ArrayList<>();
             try {
+                bazaarPriceIndex.refreshIfStale();
                 int pageLimit = Math.max(1, configManager.get().scanPageLimit);
                 for (int page = 0; page < pageLimit; page++) {
                     int pageIndex = page;

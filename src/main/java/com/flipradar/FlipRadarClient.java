@@ -4,6 +4,7 @@ import com.flipradar.api.HypixelApiClient;
 import com.flipradar.auction.AuctionPageFetcher;
 import com.flipradar.config.ConfigManager;
 import com.flipradar.data.LocalCache;
+import com.flipradar.market.BazaarPriceIndex;
 import com.flipradar.market.FlipCandidate;
 import com.flipradar.market.FlipScanner;
 import com.flipradar.safe.SafeAuctionOpener;
@@ -40,7 +41,8 @@ public final class FlipRadarClient implements ClientModInitializer {
 
         HypixelApiClient apiClient = new HypixelApiClient(cache);
         AuctionPageFetcher pageFetcher = new AuctionPageFetcher(apiClient);
-        scanner = new FlipScanner(pageFetcher, cache, configManager);
+        BazaarPriceIndex bazaarPriceIndex = new BazaarPriceIndex(apiClient);
+        scanner = new FlipScanner(pageFetcher, cache, configManager, bazaarPriceIndex);
 
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
             dispatcher.register(ClientCommandManager.literal("flipradar")
