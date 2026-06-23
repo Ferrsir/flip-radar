@@ -195,6 +195,9 @@ public final class FlipRadarScreen extends Screen {
     }
 
     private void renderChips(DrawContext context) {
+        if (compactMode()) {
+            return;
+        }
         int x = mainX();
         int y = TOP + 64;
         int w = mainW();
@@ -271,20 +274,29 @@ public final class FlipRadarScreen extends Screen {
         int right = tableRight();
         boolean selected = index == selectedIndex;
         context.fill(x + 1, y, right - 1, y + rowH() - 1, selected ? 0xFF211431 : (index % 2 == 0 ? 0xAA11151D : 0x7711151D));
-        context.fill(x + 12, y + 7, x + 38, y + 33, itemColor(flip));
-        context.fill(x + 14, y + 9, x + 36, y + 31, 0x66101018);
-        drawCentered(context, itemGlyph(flip), x + 25, y + 16, TEXT);
+        int tile = compactMode() ? 18 : 26;
+        int tileY = y + (rowH() - tile) / 2;
+        context.fill(x + 12, tileY, x + 12 + tile, tileY + tile, itemColor(flip));
+        context.fill(x + 14, tileY + 2, x + 10 + tile, tileY + tile - 2, 0x66101018);
+        drawCentered(context, itemGlyph(flip), x + 12 + tile / 2, tileY + (compactMode() ? 5 : 9), TEXT);
 
-        int itemW = Math.max(100, colBin() - 54);
-        drawText(context, trim(flip.auction().itemName(), itemW), x + 46, y + 7, selected ? PURPLE : TEXT);
-        drawText(context, subLabel(flip), x + 46, y + 22, subColor(flip));
-        drawText(context, compactCoins(flip.auction().binPrice()), x + colBin(), y + 15, YELLOW);
-        drawText(context, compactCoins(flip.estimatedMarketValue()), x + colValue(), y + 15, suspicious(flip) ? YELLOW : TEXT);
-        drawText(context, "+" + compactCoins(flip.profitAfterTax()), x + colProfit(), y + 15, suspicious(flip) ? YELLOW : GREEN);
-        drawText(context, percentText(flip.profitPercent()) + "%", x + colPct(), y + 15, suspicious(flip) ? YELLOW : GREEN);
-        drawText(context, flip.confidencePercent() + "%", x + colConf(), y + 15, confidenceColor(flip.confidencePercent()));
-        drawText(context, String.format(Locale.US, "%.0f/day", flip.volumePerDay()), x + colVol(), y + 15, MUTED);
-        drawRight(context, flip.ageMinutes() + "m", right - 12, y + 15, flip.ageMinutes() > configManager.get().maxAuctionAgeMinutes ? YELLOW : MUTED);
+        int itemX = compactMode() ? x + 38 : x + 46;
+        int itemW = Math.max(100, colBin() - (itemX - x) - 8);
+        int textY = y + (compactMode() ? 10 : 7);
+        int statY = y + (compactMode() ? 10 : 15);
+        drawText(context, trim(flip.auction().itemName(), itemW), itemX, textY, selected ? PURPLE : TEXT);
+        if (!compactMode()) {
+            drawText(context, subLabel(flip), itemX, y + 22, subColor(flip));
+        }
+        drawText(context, compactCoins(flip.auction().binPrice()), x + colBin(), statY, YELLOW);
+        drawText(context, compactCoins(flip.estimatedMarketValue()), x + colValue(), statY, suspicious(flip) ? YELLOW : TEXT);
+        drawText(context, "+" + compactCoins(flip.profitAfterTax()), x + colProfit(), statY, suspicious(flip) ? YELLOW : GREEN);
+        drawText(context, percentText(flip.profitPercent()) + "%", x + colPct(), statY, suspicious(flip) ? YELLOW : GREEN);
+        drawText(context, flip.confidencePercent() + "%", x + colConf(), statY, confidenceColor(flip.confidencePercent()));
+        if (!compactMode()) {
+            drawText(context, String.format(Locale.US, "%.0f/day", flip.volumePerDay()), x + colVol(), statY, MUTED);
+            drawRight(context, flip.ageMinutes() + "m", right - 12, statY, flip.ageMinutes() > configManager.get().maxAuctionAgeMinutes ? YELLOW : MUTED);
+        }
         context.fill(x + 1, y + rowH() - 1, right - 1, y + rowH(), LINE);
     }
 
@@ -339,6 +351,9 @@ public final class FlipRadarScreen extends Screen {
     }
 
     private void renderProfitPanel(DrawContext context) {
+        if (compactMode()) {
+            return;
+        }
         int y = tableBottom() + 34;
         if (y + 58 > height - 38) {
             return;
@@ -424,7 +439,7 @@ public final class FlipRadarScreen extends Screen {
     }
 
     private int tableY() {
-        return TOP + 100;
+        return compactMode() ? TOP + 72 : TOP + 100;
     }
 
     private int tableRight() {
@@ -432,16 +447,20 @@ public final class FlipRadarScreen extends Screen {
     }
 
     private int tableBottom() {
-        int preferred = height - 122;
+        int preferred = compactMode() ? height - 42 : height - 122;
         return Math.max(tableY() + 100, preferred);
     }
 
     private int rowH() {
-        return 42;
+        return compactMode() ? 28 : 42;
     }
 
     private int visibleRows() {
         return Math.max(1, (tableBottom() - (tableY() + 30)) / rowH());
+    }
+
+    private boolean compactMode() {
+        return height < 420 || mainW() < 560;
     }
 
     private int colBin() {

@@ -1,6 +1,7 @@
 package com.flipradar.auction;
 
 import java.text.Normalizer;
+import java.util.Map;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -55,13 +56,14 @@ public final class ItemSignatureBuilder {
             signature.append(itemData.petLevel() >= 100 ? "|pet-level:100" : "|pet-level:1");
         }
 
-        signature.append("|stars:").append(itemData.dungeonStars());
+        signature.append("|stars:").append(significantStars(itemData.dungeonStars()));
         signature.append("|recomb:").append(itemData.recombobulated());
         signature.append("|hpb:").append(Math.min(15, itemData.hotPotatoBooks()));
 
-        if (!itemData.enchants().isEmpty()) {
+        Map<String, Integer> significantEnchants = significantEnchants(itemData.enchants());
+        if (!significantEnchants.isEmpty()) {
             signature.append("|enchants:");
-            itemData.enchants().forEach((key, value) -> signature.append(key).append('=').append(value).append(','));
+            significantEnchants.forEach((key, value) -> signature.append(key).append('=').append(value).append(','));
         } else {
             signature.append("|enchants:0");
         }
@@ -77,6 +79,30 @@ public final class ItemSignatureBuilder {
         }
 
         return signature.toString();
+    }
+
+    private int significantStars(int stars) {
+        return stars < 5 ? 0 : stars;
+    }
+
+    private Map<String, Integer> significantEnchants(Map<String, Integer> enchants) {
+        Map<String, Integer> significant = new java.util.TreeMap<>();
+        enchants.forEach((key, value) -> {
+            String normalized = key.toLowerCase(Locale.ROOT);
+            if (normalized.startsWith("ultimate_") || value >= 7 || expensiveNormalEnchant(normalized, value)) {
+                significant.put(normalized, value);
+            }
+        });
+        return significant;
+    }
+
+    private boolean expensiveNormalEnchant(String enchant, int level) {
+        return level >= 6 && switch (enchant) {
+            case "champion", "counter_strike", "big_brain", "vicious", "overload", "snipe", "cubism",
+                 "ender_slayer", "dragon_hunter", "giant_killer", "growth", "protection", "sharpness",
+                 "power", "critical", "first_strike", "prosecute", "execute" -> true;
+            default -> false;
+        };
     }
 
     private String petLevelBucket(String normalizedName) {

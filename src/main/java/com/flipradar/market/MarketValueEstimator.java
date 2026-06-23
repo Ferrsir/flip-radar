@@ -30,9 +30,9 @@ public final class MarketValueEstimator {
             return componentAdjustedEstimate(auction, activeAuctions);
         }
 
-        int lowClusterSize = Math.min(8, sanePrices.size());
+        int lowClusterSize = Math.min(10, sanePrices.size());
         List<Long> lowestComparableBins = sanePrices.subList(0, lowClusterSize);
-        long estimate = conservativePercentile(lowestComparableBins, 60);
+        long estimate = conservativePercentile(lowestComparableBins, 40);
 
         if (isComplexItem(auction) && lowestComparableBins.size() < 8) {
             return componentAdjustedEstimate(auction, activeAuctions);
@@ -66,10 +66,10 @@ public final class MarketValueEstimator {
             return 0L;
         }
 
-        long baseValue = conservativePercentile(saneBasePrices.subList(0, Math.min(8, saneBasePrices.size())), 50);
+        long baseValue = conservativePercentile(saneBasePrices.subList(0, Math.min(10, saneBasePrices.size())), 35);
         long componentValue = conservativeComponentValue(auction);
         long estimate = baseValue + componentValue;
-        long maxSupportedValue = Math.max(auction.binPrice() * 4L, auction.binPrice() + 20_000_000L);
+        long maxSupportedValue = Math.max(auction.binPrice() * 3L, auction.binPrice() + 15_000_000L);
         return Math.min(estimate, maxSupportedValue);
     }
 
